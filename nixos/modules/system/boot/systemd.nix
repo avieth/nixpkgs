@@ -569,6 +569,16 @@ in
       '';
     };
 
+    services.sleep.extraConfig = mkOption {
+      default = "";
+      type = types.lines;
+      example = "HibernateMode=disk";
+      description = ''
+        Extra config options for sytemd-sleep. See man systemd-sleep.conf for
+        available options.
+      '';
+    };
+
     systemd.tmpfiles.rules = mkOption {
       type = types.listOf types.str;
       default = [];
@@ -682,6 +692,7 @@ in
 
       "systemd/sleep.conf".text = ''
         [Sleep]
+        ${config.services.sleep.extraConfig}
       '';
 
       "tmpfiles.d/systemd.conf".source = "${systemd}/example/tmpfiles.d/systemd.conf";
