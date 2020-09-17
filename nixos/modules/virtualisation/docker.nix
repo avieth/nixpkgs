@@ -9,6 +9,23 @@ let
   cfg = config.virtualisation.docker;
   proxy_env = config.networking.proxy.envVars;
 
+  makeImageService = name: image: {
+    wantedBy = ["multi-user.target"];
+    after = ["docker.service" "docker.socket"];
+    path = [ cfg.package ];
+    preStart = "${cfg.package}/bin/docker rmi -f ${name} || true";
+    postStop = "${cfg.package}/bin/docker rmi -f ${name} || true";
+    serviceConfig = {
+      Type = "oneshot";
+      StandardOutput = "null";
+      StandardError = "null";
+      ExecStart = "${cfg.package}/bin/docker load -i ${image}";
+      ExecStop = "";
+      TimeoutStartSec = 0;
+      TimeoutStopSec = 120;
+    };
+  };
+
 in
 
 {
@@ -144,6 +161,16 @@ in
         Docker package to be used in the module.
       '';
     };
+
+    images = mkOption {
+      default = {};
+      type = types.attrsOf types.package;
+      description = ''
+        Docker images to load. The attribute name determines a oneshot systemd
+        service called <literal>docker-{name}.service</literal> which loads the
+        image on start and removes it on stop.
+      '';
+    };
   };
 
   ###### implementation
@@ -155,30 +182,49 @@ in
       users.groups.docker.gid = config.ids.gids.docker;
       systemd.packages = [ cfg.package ];
 
-      systemd.services.docker = {
-        wantedBy = optional cfg.enableOnBoot "multi-user.target";
-        environment = proxy_env;
-        serviceConfig = {
-          ExecStart = [
-            ""
-            ''
-              ${cfg.package}/bin/dockerd \
-                --group=docker \
-                --host=fd:// \
-                --log-driver=${cfg.logDriver} \
-                ${optionalString (cfg.storageDriver != null) "--storage-driver=${cfg.storageDriver}"} \
-                ${optionalString cfg.liveRestore "--live-restore" } \
-                ${optionalString cfg.enableNvidia "--add-runtime nvidia=${pkgs.nvidia-docker}/bin/nvidia-container-runtime" } \
-                ${cfg.extraOptions}
-            ''];
-          ExecReload=[
-            ""
-            "${pkgs.procps}/bin/kill -s HUP $MAINPID"
-          ];
+      systemd.services = (mapAttrs'(name: image: nameValuePair "docker-${name}" (makeImageService name image)) cfg.images) // {
+
+        docker = {
+          wantedBy = optional cfg.enableOnBoot "multi-user.target";
+          environment = proxy_env;
+          serviceConfig = {
+            ExecStart = [
+              ""
+              ''
+                ${cfg.package}/bin/dockerd \
+                  --group=docker \
+                  --host=fd:// \
+                  --log-driver=${cfg.logDriver} \
+                  ${optionalString (cfg.storageDriver != null) "--storage-driver=${cfg.storageDriver}"} \
+                  ${optionalString cfg.liveRestore "--live-restore" } \
+                  ${optionalString cfg.enableNvidia "--add-runtime nvidia=${pkgs.nvidia-docker}/bin/nvidia-container-runtime" } \
+                  ${cfg.extraOptions}
+              ''];
+            ExecReload=[
+              ""
+              "${pkgs.procps}/bin/kill -s HUP $MAINPID"
+            ];
+          };
+
+          path = [ pkgs.kmod ] ++ optional (cfg.storageDriver == "zfs") pkgs.zfs
+            ++ optional cfg.enableNvidia pkgs.nvidia-docker;
         };
 
-        path = [ pkgs.kmod ] ++ optional (cfg.storageDriver == "zfs") pkgs.zfs
-          ++ optional cfg.enableNvidia pkgs.nvidia-docker;
+        docker-prune = {
+          description = "Prune docker resources";
+
+          restartIfChanged = false;
+          unitConfig.X-StopOnRemoval = false;
+
+          serviceConfig.Type = "oneshot";
+
+          script = ''
+            ${cfg.package}/bin/docker system prune -f ${toString cfg.autoPrune.flags}
+          '';
+
+          startAt = optional cfg.autoPrune.enable cfg.autoPrune.dates;
+        };
+
       };
 
       systemd.sockets.docker = {
@@ -190,21 +236,6 @@ in
           SocketUser = "root";
           SocketGroup = "docker";
         };
-      };
-
-      systemd.services.docker-prune = {
-        description = "Prune docker resources";
-
-        restartIfChanged = false;
-        unitConfig.X-StopOnRemoval = false;
-
-        serviceConfig.Type = "oneshot";
-
-        script = ''
-          ${cfg.package}/bin/docker system prune -f ${toString cfg.autoPrune.flags}
-        '';
-
-        startAt = optional cfg.autoPrune.enable cfg.autoPrune.dates;
       };
 
       assertions = [
