@@ -9,7 +9,8 @@ rec {
   fsNeededForBoot = fs: fs.neededForBoot || elem fs.mountPoint pathsNeededForBoot;
 
   # Check whenever `b` depends on `a` as a fileSystem
-  fsBefore = a: b: a.mountPoint == b.device
+  fsBefore = a: b: (any (x: x == a.mountPoint) b.after)
+                || a.mountPoint == b.device
                 || hasPrefix "${a.mountPoint}${optionalString (!(hasSuffix "/" a.mountPoint)) "/"}" b.mountPoint;
 
   # Escape a path according to the systemd rules, e.g. /dev/xyzzy

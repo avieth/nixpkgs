@@ -29,6 +29,13 @@ let
 
     options = {
 
+      after = mkOption {
+        example = [];
+        type = types.listOf nonEmptyStr;
+        description = "Explicit list of dependencies";
+        default = [];
+      };
+
       mountPoint = mkOption {
         example = "/mnt/usb";
         type = nonEmptyStr;
