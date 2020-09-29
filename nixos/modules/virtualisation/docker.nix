@@ -9,7 +9,7 @@ let
   cfg = config.virtualisation.docker;
   proxy_env = config.networking.proxy.envVars;
 
-  makeImageService = name: image: {
+  makeImageService = name: imageAttrs: {
     wantedBy = ["multi-user.target"];
     after = ["docker.service" "docker.socket"];
     path = [ cfg.package ];
@@ -17,12 +17,28 @@ let
     postStop = "${cfg.package}/bin/docker rmi -f ${name} || true";
     serviceConfig = {
       Type = "oneshot";
-      StandardOutput = "null";
-      StandardError = "null";
-      ExecStart = "${cfg.package}/bin/docker load -i ${image}";
+      RemainAfterExit = "true";
+      StandardOutput = "syslog";
+      StandardError = "syslog";
+      ExecStart = "${cfg.package}/bin/docker load -i ${imageAttrs.image}";
       ExecStop = "";
-      TimeoutStartSec = 0;
-      TimeoutStopSec = 120;
+      TimeoutStartSec = imageAttrs.timeoutStartSec or 120;
+      TimeoutStopSec  = imageAttrs.timeoutStopSec  or 120;
+    };
+  };
+
+  imageOptions = { ... }: {
+    options = {
+      image = mkOption {
+        type = types.package;
+        description = "Docker image to load.";
+        example = "dockerTools.buildImage { ... }";
+      };
+      timeout = mkOption {
+        type = types.nullOr types.int;
+        description = "Timeout in seconds for loading and unloading";
+        default = 120;
+      };
     };
   };
 
@@ -164,11 +180,12 @@ in
 
     images = mkOption {
       default = {};
-      type = types.attrsOf types.package;
+      type = types.attrsOf (types.submodule imageOptions);
       description = ''
         Docker images to load. The attribute name determines a oneshot systemd
         service called <literal>docker-{name}.service</literal> which loads the
-        image on start and removes it on stop.
+        docker image given at the "image" attribute of this attr set on start
+        and removes it on stop.
       '';
     };
   };
