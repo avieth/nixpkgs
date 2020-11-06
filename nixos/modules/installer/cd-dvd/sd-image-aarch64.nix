@@ -4,7 +4,6 @@
 
 {
   imports = [
-    ../../profiles/base.nix
     ../../profiles/installation-device.nix
     ./sd-image.nix
   ];
