@@ -21,7 +21,7 @@ stdenv.mkDerivation rec {
   pname = "dconf";
   version = "0.36.0";
 
-  outputs = [ "out" "lib" "dev" "devdoc" ];
+  outputs = [ "out" "lib" "dev" ];
 
   src = fetchurl {
     url = "mirror://gnome/sources/${pname}/${stdenv.lib.versions.majorMinor version}/${pname}-${version}.tar.xz";
@@ -59,7 +59,10 @@ stdenv.mkDerivation rec {
 
   mesonFlags = [
     "--sysconfdir=/etc"
-    "-Dgtk_doc=true"
+    "-Dvapi=false"
+    "-Dgtk_doc=false"
+    "-Dman=false"
+    "-Dbash_completion=false"
   ];
 
   doCheck = !stdenv.isAarch32 && !stdenv.isAarch64 && !stdenv.isDarwin;
