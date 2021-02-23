@@ -23,6 +23,7 @@ lib.overrideDerivation (buildLinux (args // {
     "4" = "bcm2711_defconfig";
   }.${toString rpiVersion};
 
+
   features = {
     efiBootStub = false;
   } // (args.features or {});
@@ -38,6 +39,9 @@ lib.overrideDerivation (buildLinux (args // {
     #  7757 |    is_hdr_metadata_different(old_con_state, new_con_state);
     #       |    ^~~~~~~~~~~~~~~~~~~~~~~~~
     DRM_AMDGPU n
+
+    # ../drivers/pci/controller/pcie-altera.c:679:8: error: too few arguments to function 'devm_of_pci_get_host_bridge_resources'
+    PCIE_ALTERA n
   '';
 
   extraMeta = if (rpiVersion < 3) then {
