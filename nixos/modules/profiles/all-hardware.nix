@@ -62,15 +62,6 @@ in
       # Allows using framebuffer configured by the initial boot firmware
       "simplefb"
 
-      # Allwinner support
-
-      # Required for early KMS
-      "sun4i-drm"
-      "sun8i-mixer" # Audio, but required for kms
-
-      # PWM for the backlight
-      "pwm-sun4i"
-
       # Broadcom
 
       "vc4"
@@ -82,14 +73,6 @@ in
       # Broadcom
 
       "pcie-brcmstb"
-
-      # Rockchip
-      "dw-hdmi"
-      "dw-mipi-dsi"
-      "rockchipdrm"
-      "rockchip-rga"
-      "phy-rockchip-pcie"
-      "pcie-rockchip-host"
 
       # Misc. uncategorized hardware
 
