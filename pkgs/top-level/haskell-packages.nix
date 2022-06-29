@@ -8,14 +8,24 @@ let
     "ghc8102BinaryMinimal"
     "ghc8107Binary"
     "ghc8107BinaryMinimal"
+    "ghc922Binary"
+    "ghc922BinaryMinimal"
     "ghcjs"
     "ghcjs810"
     "integer-simple"
     "native-bignum"
+    # FIXME should have these too
+    #"ghc902"
+    #"ghc922"
+    "ghc941"
     "ghcHEAD"
   ];
 
   nativeBignumIncludes = [
+    # FIXME should have these too
+    #"ghc902"
+    #"ghc923"
+    "ghc941"
     "ghcHEAD"
   ];
 
@@ -127,8 +137,30 @@ in {
       buildLlvmPackages = buildPackages.llvmPackages_10;
       llvmPackages = pkgs.llvmPackages_10;
     };
+    ghc922Binary = callPackage ../development/compilers/ghc/9.2.2-binary.nix {
+      llvmPackages = pkgs.llvmPackages_12;
+    };
+    ghc922BinaryMinimal = callPackage ../development/compilers/ghc/9.2.2-binary.nix {
+      llvmPackages = pkgs.llvmPackages_12;
+      minimal = true;
+    };
+    ghc941 = callPackage ../development/compilers/ghc/9.4.1.nix {
+      bootPkgs =
+        # aarch64 ghc922Binary exceeds max output size on hydra ?? FIXME check this
+        if stdenv.isAarch64 || stdenv.isAarch32 then
+          packages.ghc922BinaryMinimal
+        else
+          packages.ghc922Binary;
+      inherit (buildPackages.python3Packages) sphinx;
+      # Need to use apple's patched xattr until
+      # https://github.com/xattr/xattr/issues/44 and
+      # https://github.com/xattr/xattr/issues/55 are solved.
+      inherit (buildPackages.darwin) xattr autoSignDarwinBinariesHook;
+      buildTargetLlvmPackages = buildPackages.llvmPackages_12;
+      llvmPackages = pkgs.llvmPackages_12;
+    };
     ghcHEAD = callPackage ../development/compilers/ghc/head.nix {
-      bootPkgs = packages.ghc8107Binary;
+      bootPkgs = packages.ghc922Binary;
       inherit (buildPackages.python3Packages) sphinx;
       # Need to use apple's patched xattr until
       # https://github.com/xattr/xattr/issues/44 and
@@ -222,6 +254,21 @@ in {
       buildHaskellPackages = bh.packages.ghc922;
       ghc = bh.compiler.ghc922;
       compilerConfig = callPackage ../development/haskell-modules/configuration-ghc-9.2.x.nix { };
+    };
+    ghc922Binary = callPackage ../development/haskell-modules {
+      buildHaskellPackages = bh.packages.ghc922Binary;
+      ghc = bh.compiler.ghc922Binary;
+      compilerConfig = callPackage ../development/haskell-modules/configuration-ghc-9.2.x.nix { };
+    };
+    ghc922BinaryMinimal = callPackage ../development/haskell-modules {
+      buildHaskellPackages = bh.packages.ghc922BinaryMinimal;
+      ghc = bh.compiler.ghc922BinaryMinimal;
+      compilerConfig = callPackage ../development/haskell-modules/configuration-ghc-9.2.x.nix { };
+    };
+    ghc941 = callPackage ../development/haskell-modules {
+      buildHaskellPackages = bh.packages.ghc941;
+      ghc = bh.compiler.ghc941;
+      compilerConfig = callPackage ../development/haskell-modules/configuration-ghc-head.nix { };
     };
     ghcHEAD = callPackage ../development/haskell-modules {
       buildHaskellPackages = bh.packages.ghcHEAD;
