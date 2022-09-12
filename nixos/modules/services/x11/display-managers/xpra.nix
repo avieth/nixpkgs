@@ -35,6 +35,13 @@ in
 
       pulseaudio = mkEnableOption "pulseaudio audio streaming";
 
+      xvfbCommand = mkOption {
+        type = types.str;
+        default = "Xorg";
+        example = "Xorg";
+        description = "Command to use for the xpra option";
+      };
+
       extraOptions = mkOption {
         description = "Extra xpra options";
         default = [];
@@ -234,7 +241,7 @@ in
         --pulseaudio=no \
         ${optionalString (cfg.pulseaudio) "--sound-source=pulse"} \
         --socket-dirs=/run/xpra \
-        --xvfb="xpra_Xdummy ${concatStringsSep " " dmcfg.xserverArgs}" \
+        --xvfb="${cfg.xvfbCommand} ${concatStringsSep " " dmcfg.xserverArgs}" \
         ${optionalString (cfg.bindTcp != null) "--bind-tcp=${cfg.bindTcp}"} \
         --auth=${cfg.auth} \
         ${concatStringsSep " " cfg.extraOptions}
