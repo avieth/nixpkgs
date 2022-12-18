@@ -1,5 +1,5 @@
 { lib, stdenv, fetchPypi, buildPythonPackage, python, pkg-config, dbus, dbus-glib, isPyPy
-, ncurses, pygobject3, isPy3k }:
+, ncurses, pygobject3, isPy3k, pkgs }:
 
 buildPythonPackage rec {
   pname = "dbus-python";
@@ -27,6 +27,7 @@ buildPythonPackage rec {
     "PYTHON_VERSION=${lib.versions.major python.version}"
   ];
 
+  depsBuildBuild = [ pkgs.buildPackages.python3 ];
   nativeBuildInputs = [ pkg-config ];
   buildInputs = [ dbus dbus-glib ]
     # My guess why it's sometimes trying to -lncurses.

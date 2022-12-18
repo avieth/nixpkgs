@@ -22,6 +22,45 @@ let
       }).config.system.build.toplevel
     ) config.specialisation;
 
+  systemBuilderNoKernel = ''
+    mkdir $out
+
+    echo "$activationScript" > $out/activate
+    echo "$dryActivationScript" > $out/dry-activate
+    substituteInPlace $out/activate --subst-var out
+    substituteInPlace $out/dry-activate --subst-var out
+    chmod u+x $out/activate $out/dry-activate
+    unset activationScript dryActivationScript
+    ${pkgs.stdenv.shell} -n $out/activate
+    ${pkgs.stdenv.shell} -n $out/dry-activate
+
+    cp ${config.system.build.bootStage2} $out/init
+    substituteInPlace $out/init --subst-var-by systemConfig $out
+
+    ln -s ${config.system.build.etc}/etc $out/etc
+    ln -s ${config.system.path} $out/sw
+    ln -s "$systemd" $out/systemd
+
+    echo -n "$configurationName" > $out/configuration-name
+    echo -n "systemd ${toString config.systemd.package.interfaceVersion}" > $out/init-interface-version
+    echo -n "$nixosLabel" > $out/nixos-version
+    # FIXME make configurable?
+    echo -n aarch64-linux > $out/system
+
+    mkdir $out/specialisation
+    ${concatStringsSep "\n"
+    (mapAttrsToList (name: path: "ln -s ${path} $out/specialisation/${name}") children)}
+
+    mkdir $out/bin
+    export localeArchive="${config.i18n.glibcLocales}/lib/locale/locale-archive"
+    substituteAll ${./switch-to-configuration.pl} $out/bin/switch-to-configuration
+    chmod +x $out/bin/switch-to-configuration
+
+    echo -n "${toString config.system.extraDependencies}" > $out/extra-dependencies
+
+    ${config.system.extraSystemBuilderCmds}
+  '';
+
   systemBuilder =
     let
       kernelPath = "${config.boot.kernelPackages.kernel}/" +
@@ -99,7 +138,7 @@ let
     name = "nixos-system-${config.system.name}-${config.system.nixos.label}";
     preferLocalBuild = true;
     allowSubstitutes = false;
-    buildCommand = systemBuilder;
+    buildCommand = systemBuilderNoKernel;
 
     inherit (pkgs) coreutils;
     systemd = config.systemd.package;

@@ -30,6 +30,7 @@
 # patch not updating the tests correctly yet, or doing something wrong,
 # or being unrelated to that.
 , doCheck ? (stdenv.isLinux && !stdenv.hostPlatform.isMusl)
+, doDocs ? (stdenv.buildPlatform == stdenv.hostPlatform)
 }:
 
 let
@@ -80,9 +81,10 @@ stdenv.mkDerivation rec {
     })
   ];
 
+  depsBuildBuild = [ gtk-doc ];
+
   nativeBuildInputs = [
     glib
-    gtk-doc
     pkg-config
     gettext
     meson
@@ -96,12 +98,12 @@ stdenv.mkDerivation rec {
         doCheck = false;
       }))
     ]))
-
+  ] ++ (if !doDocs then [] else [
     # man pages
     libxslt
     docbook-xsl-nons
     docbook_xml_dtd_412
-  ];
+  ]);
 
   buildInputs = [
     expat
@@ -130,8 +132,8 @@ stdenv.mkDerivation rec {
     "-Dos_type=redhat" # only affects PAM includes
     "-Dintrospection=${lib.boolToString withIntrospection}"
     "-Dtests=${lib.boolToString doCheck}"
-    "-Dgtk_doc=${lib.boolToString true}"
-    "-Dman=true"
+    "-Dgtk_doc=${if doDocs then "true" else "false"}"
+    "-Dman=${if doDocs then "true" else "false"}"
   ] ++ lib.optionals stdenv.isLinux [
     "-Dsession_tracking=${if useSystemd then "libsystemd-login" else "libelogind"}"
   ];
