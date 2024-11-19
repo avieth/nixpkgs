@@ -1,0 +1,11 @@
+--- a/setup.py
++++ b/setup.py
+@@ -787,7 +787,7 @@
+             "--libs" : "extra_link_args",
+             "--cflags" : "extra_compile_args",
+             }.items():
+-            pkg_config_cmd = ["pkg-config", pc_arg] + list(pkgs_options)
++            pkg_config_cmd = [PKG_CONFIG, pc_arg] + list(pkgs_options)
+             if verbose_ENABLED:
+                 print("pkg_config_cmd=%s" % (pkg_config_cmd, ))
+             r, pkg_config_out, err = get_status_output(pkg_config_cmd)

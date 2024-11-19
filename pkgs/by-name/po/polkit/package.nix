@@ -30,6 +30,7 @@
 # patch not updating the tests correctly yet, or doing something wrong,
 # or being unrelated to that.
 , doCheck ? (stdenv.hostPlatform.isLinux && !stdenv.hostPlatform.isMusl)
+, doDocs ? (stdenv.buildPlatform == stdenv.hostPlatform)
 }:
 
 let
@@ -76,12 +77,12 @@ stdenv.mkDerivation rec {
     meson
     ninja
     perl
-
+  ] ++ (if !doDocs then [] else [
     # man pages
     libxslt
     docbook-xsl-nons
     docbook_xml_dtd_412
-  ] ++ lib.optionals withIntrospection [
+  ]) ++ lib.optionals withIntrospection [
     gobject-introspection
     gtk-doc
   ] ++ lib.optionals (withIntrospection && !stdenv.buildPlatform.canExecute stdenv.hostPlatform) [
@@ -136,8 +137,8 @@ stdenv.mkDerivation rec {
     "-Dos_type=redhat" # only affects PAM includes
     "-Dintrospection=${lib.boolToString withIntrospection}"
     "-Dtests=${lib.boolToString doCheck}"
-    "-Dgtk_doc=${lib.boolToString withIntrospection}"
-    "-Dman=true"
+    "-Dgtk_doc=${if doDocs then lib.boolToString withIntrospection else "false"}"
+    "-Dman=${if doDocs then "true" else "false"}"
   ] ++ lib.optionals stdenv.hostPlatform.isLinux [
     "-Dsession_tracking=${if useSystemd then "libsystemd-login" else "libelogind"}"
   ];

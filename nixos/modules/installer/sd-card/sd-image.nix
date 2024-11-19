@@ -88,6 +88,15 @@ in
       '';
     };
 
+    diskId = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      example = "ffffffff";
+      description = ''
+        The MBR disk identifier without the 0x prefix.
+      '';
+    };
+
     rootPartitionUUID = mkOption {
       type = types.nullOr types.str;
       default = null;
@@ -225,6 +234,10 @@ in
             start=''${gap}M, size=$firmwareSizeBlocks, type=b
             start=$((gap + ${toString config.sdImage.firmwareSize}))M, type=83, bootable
         EOF
+
+        # Set the disk identifier if given
+        # FIXME can this be done in the script above?
+        ${if config.sdImage.diskId != null then "sfdisk --disk-id $img 0x${config.sdImage.diskId}" else ""}
 
         # Copy the rootfs into the SD image
         eval $(partx $img -o START,SECTORS --nr 2 --pairs)

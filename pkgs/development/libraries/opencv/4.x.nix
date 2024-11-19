@@ -397,7 +397,8 @@ effectiveStdenv.mkDerivation {
     cmake
     pkg-config
     unzip
-  ] ++ optionals enablePython [
+  ] ++ lib.optionals enablePython [
+    pythonPackages.python
     pythonPackages.pip
     pythonPackages.wheel
     pythonPackages.setuptools
@@ -481,6 +482,10 @@ effectiveStdenv.mkDerivation {
     (cmakeOptionType "path" "OPENCL_LIBRARY" "${ocl-icd}/lib/libOpenCL.so")
   ] ++ optionals enablePython [
     (cmakeOptionType "path" "OPENCV_PYTHON_INSTALL_PATH" pythonPackages.python.sitePackages)
+    # "-DOPENCV_SKIP_PYTHON_LOADER=ON"
+    # "-DPYTHON_VERSION=${pythonPackages.python.pythonVersion}"
+    # "-DPYTHON_VERSION_STRING=${pythonPackages.python.pythonVersion}"
+
   ] ++ optionals (enabledModules != [ ]) [
     (cmakeFeature "BUILD_LIST" (concatStringsSep "," enabledModules))
   ];

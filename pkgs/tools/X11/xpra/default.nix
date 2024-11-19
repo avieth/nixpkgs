@@ -5,6 +5,7 @@
 , writeText
 , wrapGAppsHook3
 , withNvenc ? false
+, buildPackages
 , atk
 , cairo
 , cudatoolkit
@@ -21,6 +22,7 @@
 , libvpx
 , libwebp
 , lz4
+, openssl
 , nv-codec-headers-10
 , nvidia_x11 ? null
 , pam
@@ -82,6 +84,10 @@ in buildPythonApplication rec {
   patches = [
     ./fix-41106.patch  # https://github.com/NixOS/nixpkgs/issues/41106
     ./fix-122159.patch # https://github.com/NixOS/nixpkgs/issues/122159
+    # The setup.py script sets PKG_CONFIG but then calls "pkg-config". This
+    # patch makes it use the env var, allowing cross compilation, where the
+    # pkg-config executable has a target prefix.
+    ./fix-pkg-config.patch
   ];
 
   postPatch = lib.optionalString stdenv.hostPlatform.isLinux ''
@@ -131,6 +137,8 @@ in buildPythonApplication rec {
     lz4
     pam
     pango
+    pulseaudio
+    openssl
     x264
     x265
     xxHash
@@ -144,7 +152,7 @@ in buildPythonApplication rec {
     lz4
     netifaces
     numpy
-    opencv4
+    #opencv4
     pam
     paramiko
     pillow
@@ -154,10 +162,14 @@ in buildPythonApplication rec {
     pygobject3
     pyinotify
     pyopengl
+    pyopenssl
+    openssl
     python-uinput
     pyxdg
     rencode
     invoke
+    aiounittest
+    pytest-asyncio
   ] ++ lib.optionals withNvenc [
     pycuda
     pynvml
@@ -168,12 +180,13 @@ in buildPythonApplication rec {
 
   setupPyBuildFlags = [
     "--with-Xdummy"
-    "--without-Xdummy_wrapper"
+    "--with-Xdummy_wrapper"
     "--without-strict"
     "--with-gtk3"
     # Override these, setup.py checks for headers in /usr/* paths
     "--with-pam"
     "--with-vsock"
+    "--pkg-config-path=${buildPackages.pkg-config}/bin/${buildPackages.pkg-config.targetPrefix}pkg-config"
   ] ++ lib.optional withNvenc "--with-nvenc";
 
   dontWrapGApps = true;

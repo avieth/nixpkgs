@@ -1,4 +1,4 @@
-{ lib, stdenv, fetchurl, libX11, libXinerama }:
+{ lib, stdenv, fetchurl, libX11, libXinerama, buildPackages }:
 
 stdenv.mkDerivation  rec {
   pname = "libfakeXinerama";
@@ -11,10 +11,12 @@ stdenv.mkDerivation  rec {
 
   buildInputs = [ libX11 libXinerama ];
 
+  nativeBuildInputs = [ buildPackages.stdenv.cc ];
+
   buildPhase = ''
     runHook preBuild
 
-    $CC -O2 -Wall fakeXinerama.c -fPIC -o libfakeXinerama.so.1.0 -shared
+    ${buildPackages.stdenv.cc}/bin/cc -O2 -Wall fakeXinerama.c -fPIC -o libfakeXinerama.so.1.0 -shared
 
     runHook postBuild
   '';
