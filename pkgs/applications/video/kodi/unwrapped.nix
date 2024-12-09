@@ -1,4 +1,4 @@
-{ stdenv, lib, fetchFromGitHub, fetchzip
+args@{ stdenv, lib, fetchFromGitHub, fetchzip
 , autoconf, automake, libtool, makeWrapper
 , pkg-config, cmake, yasm, python3Packages
 , libxcrypt, libgcrypt, libgpg-error, libunistring
@@ -31,9 +31,9 @@
 , opticalSupport ? true
 , usbSupport  ? false, libusb-compat-0_1
 , vdpauSupport ? true, libvdpau
-, waylandSupport ? false, wayland, wayland-protocols
+, waylandSupport ? true, wayland, wayland-protocols
 , waylandpp ?  null, libxkbcommon
-, gbmSupport ? false, mesa, libinput, libdisplay-info
+, gbmSupport ? true, mesa, libinput, libdisplay-info
 , buildPackages
 }:
 
@@ -85,28 +85,14 @@ let
     ++ lib.optional waylandSupport "wayland"
     ++ lib.optional x11Support "x11";
 
-in stdenv.mkDerivation (finalAttrs: {
-    pname = "kodi";
-    version = "21.1";
-    kodiReleaseName = "Omega";
+  # For dependencyConfigure.
+  buildDir = "${stdenv.buildPlatform.parsed.cpu.name}-${stdenv.buildPlatform.parsed.kernel.name}-${stdenv.buildPlatform.parsed.abi.name}-native";
+  buildDirNoAbi = "${stdenv.buildPlatform.parsed.cpu.name}-${stdenv.buildPlatform.parsed.kernel.name}-native";
 
-    src = fetchFromGitHub {
-      owner = "xbmc";
-      repo  = "xbmc";
-      rev   = "${finalAttrs.version}-${finalAttrs.kodiReleaseName}";
-      hash  = "sha256-NjId1T1cw9dl0Fx1QDsijiN1VUpuQ/EFl1kxWSESCR4=";
-    };
+  # JsonSchemaBuilder and TexturePacker dependencies must be built for the
+  # build machine
 
-    patches = [
-      ./no-python-lib.patch
-    ];
-
-    # make  derivations declared in the let binding available here, so
-    # they can be overridden
-    inherit libdvdcss libdvdnav libdvdread groovy
-            apache_commons_lang apache_commons_text;
-
-    buildInputs = [
+  buildInputsFrom = pkgs: with pkgs; [
       gnutls libidn2 libtasn1 nasm p11-kit
       libxml2 python3Packages.python
       boost libmicrohttpd
@@ -156,6 +142,203 @@ in stdenv.mkDerivation (finalAttrs: {
       libdisplay-info
     ];
 
+  jsonSchemaBuilderFor = kodi: buildPackages.stdenv.mkDerivation {
+    pname = "kodi-JsonSchemaBuilder";
+    version = kodi.version;
+    src = kodi.src;
+    depsBuildBuild = with buildPackages; [
+      cmake pkg-config autoconf automake libtool gnum4
+      jre_headless yasm gettext python3Packages.python flatbuffers
+    ] ++ lib.optionals waylandSupport [ wayland-protocols waylandpp.bin ];
+    nativeBuildInputs = buildInputsFrom buildPackages;
+    inherit libdvdcss libdvdnav libdvdread groovy
+            apache_commons_lang apache_commons_text;
+    cmakeFlags = [
+      "-DAPP_RENDER_SYSTEM=${if gbmSupport then "gles" else "gl"}"
+      "-Dlibdvdcss_URL=${libdvdcss}"
+      "-Dlibdvdnav_URL=${libdvdnav}"
+      "-Dlibdvdread_URL=${libdvdread}"
+      "-Dgroovy_SOURCE_DIR=${groovy}"
+      "-Dapache-commons-lang_SOURCE_DIR=${apache_commons_lang}"
+      "-Dapache-commons-text_SOURCE_DIR=${apache_commons_text}"
+      "-DENABLE_EVENTCLIENTS=ON"
+      "-DENABLE_INTERNAL_CROSSGUID=OFF"
+      "-DENABLE_INTERNAL_RapidJSON=OFF"
+      "-DSWIG_EXECUTABLE=${buildPackages.swig}/bin/swig"
+    ] ++ lib.optionals waylandSupport [
+      "-DWAYLANDPP_SCANNER=${buildPackages.waylandpp}/bin/wayland-scanner++"
+    ];
+    configurePhase = "true";
+    buildPhase = ''
+      cd tools/depends
+      autoconf -f
+      ./configure --prefix=`pwd` --with-rendersystem=${if gbmSupport then "gles" else "gl"}
+      ln -s ${buildPackages.cmake}/bin/cmake `pwd`/${buildDir}/bin/cmake
+      make -C native/JsonSchemaBuilder
+    '';
+    installPhase = ''
+      mkdir -p $out/bin
+      cp ./${buildDir}/bin/JsonSchemaBuilder $out/bin/JsonSchemaBuilder
+    '';
+  };
+
+  texturePackerFor = kodi: buildPackages.stdenv.mkDerivation {
+    pname = "kodi-TexturePacker";
+    version = kodi.version;
+    src = kodi.src;
+    depsBuildBuild = with buildPackages; [
+      cmake pkg-config autoconf automake libtool gnum4
+      jre_headless yasm gettext python3Packages.python flatbuffers
+    ] ++ lib.optionals waylandSupport [ wayland-protocols waylandpp.bin ];
+    nativeBuildInputs = buildInputsFrom buildPackages;
+    inherit libdvdcss libdvdnav libdvdread groovy
+            apache_commons_lang apache_commons_text;
+    cmakeFlags = [
+      "-DAPP_RENDER_SYSTEM=${if gbmSupport then "gles" else "gl"}"
+      "-Dlibdvdcss_URL=${libdvdcss}"
+      "-Dlibdvdnav_URL=${libdvdnav}"
+      "-Dlibdvdread_URL=${libdvdread}"
+      "-Dgroovy_SOURCE_DIR=${groovy}"
+      "-Dapache-commons-lang_SOURCE_DIR=${apache_commons_lang}"
+      "-Dapache-commons-text_SOURCE_DIR=${apache_commons_text}"
+      "-DENABLE_EVENTCLIENTS=ON"
+      "-DENABLE_INTERNAL_CROSSGUID=OFF"
+      "-DENABLE_INTERNAL_RapidJSON=OFF"
+      "-DSWIG_EXECUTABLE=${buildPackages.swig}/bin/swig"
+    ] ++ lib.optionals waylandSupport [
+      "-DWAYLANDPP_SCANNER=${buildPackages.waylandpp}/bin/wayland-scanner++"
+    ];
+    configurePhase = "true";
+    buildPhase = ''
+      cd tools/depends
+      autoconf -f
+      ./configure --prefix=`pwd` --with-rendersystem=${if gbmSupport then "gles" else "gl"}
+      ln -s ${buildPackages.cmake}/bin/cmake `pwd`/${buildDir}/bin/cmake
+      # It'll fail because cmake can't find lzo, but it will create a
+      # directory where we can manually build (g++ knows where lzo is).
+      make -C native/TexturePacker || true
+      # This directory doesn't have the ABI... weird
+      cd native/TexturePacker/${buildDirNoAbi}
+      ./autogen.sh
+      ./configure
+      make
+    '';
+    installPhase = ''
+      mkdir -p $out/bin
+      cp ./TexturePacker $out/bin/TexturePacker
+    '';
+  };
+
+  /*
+    # FIXME TODO
+    # the right thing to do here could be to define derivations for the
+    # JsonSchemaBuilder and TexturePacker and use them here, rather than trying
+    # to hack 
+   # --host=${stdenv.buildPlatform.config}
+   preConfigure = let
+     cmakeFlagsArray+=("-DCORE_PLATFORM_NAME=${lib.concatStringsSep " " kodi_platforms}")
+
+    '' + lib.optionalString (stdenv.hostPlatform != stdenv.buildPlatform) ''
+      # Need these tools on the build system when cross compiling,
+      # hacky, but have found no other way.
+      cd tools/depends
+      ./bootstrap
+      CXX=$CXX_FOR_BUILD CC=$CC_FOR_BUILD ./configure --prefix=`pwd`/../../build --with-rendersystem=gles
+      cd ../..
+
+      # JsonSchemaBuilder and TexturePacker will look for cmake here.
+      # Not sure if there's a way to override it in configure.
+      ln -s ${buildPackages.cmake}/bin/cmake ./build/${buildDir}/bin/cmake
+
+      make -C tools/depends/native/JsonSchemaBuilder
+      cmakeFlags+=" -DWITH_JSONSCHEMABUILDER=$PWD/build/${buildDir}/bin/JsonSchemaBuilder"
+
+      CMAKE_LIBRARY_PATH="${lzo}/lib" CMAKE_INCLUDE_PATH="${lzo}/include" CXX=$CXX_FOR_BUILD LD=ld make -C tools/depends/native/TexturePacker
+      cmakeFlags+=" -DWITH_TEXTUREPACKER=$PWD/build/${buildDir}/bin/TexturePacker"
+
+      #cmakeFlagsArray+=("-DLZO2_LIBRARY=${lzo}/lib")
+      #cmakeFlagsArray+=("-DLZO2_INCLUDE_DIR=${lzo}/include")
+      #export LZO2_LIBRARY=${lzo}/lib
+      #export LZO2_INCLUDE_DIR=${lzo}/include
+
+      #CXX=$CXX_FOR_BUILD LD=ld make -C tools/depends/native/JsonSchemaBuilder
+
+      #CXX=$CXX_FOR_BUILD LD=ld make EXTRA_CONFIGURE= -C tools/depends/native/TexturePacker
+    '';
+  */
+
+
+in stdenv.mkDerivation (finalAttrs: {
+    pname = "kodi";
+    version = "21.1";
+    kodiReleaseName = "Omega";
+
+    src = fetchFromGitHub {
+      owner = "xbmc";
+      repo  = "xbmc";
+      rev   = "${finalAttrs.version}-${finalAttrs.kodiReleaseName}";
+      hash  = "sha256-NjId1T1cw9dl0Fx1QDsijiN1VUpuQ/EFl1kxWSESCR4=";
+    };
+
+    patches = [
+      ./no-python-lib.patch
+    ];
+
+    # make  derivations declared in the let binding available here, so
+    # they can be overridden
+    inherit libdvdcss libdvdnav libdvdread groovy
+            apache_commons_lang apache_commons_text;
+
+    buildInputs = buildInputsFrom args; /*[
+      gnutls libidn2 libtasn1 nasm p11-kit
+      libxml2 python3Packages.python
+      boost libmicrohttpd
+      gettext pcre-cpp yajl fribidi libva libdrm
+      openssl gperf tinyxml2 tinyxml-2 taglib libssh
+      gtest ncurses spdlog
+      alsa-lib libGL libGLU fontconfig freetype ftgl
+      libjpeg libpng libtiff
+      libmpeg2 libsamplerate libmad
+      libogg libvorbis flac libxslt systemd
+      lzo libcdio libmodplug libass libbluray libudfread
+      sqlite libmysqlclient avahi lame
+      curl bzip2 zip unzip mesa-demos
+      libcec libcec_platform dcadec libuuid
+      libxcrypt libgcrypt libgpg-error libunistring
+      libcrossguid libplist
+      bluez giflib glib harfbuzz lcms2 libpthreadstubs
+      ffmpeg flatbuffers fstrcmp rapidjson
+      lirc
+      mesa # for libEGL
+    ]
+    ++ lib.optionals x11Support [
+      libX11 xorgproto libXt libXmu libXext.dev libXdmcp
+      libXinerama libXrandr.dev libXtst libXfixes
+    ]
+    ++ lib.optional  dbusSupport     dbus
+    ++ lib.optional  joystickSupport cwiid
+    ++ lib.optional  nfsSupport      libnfs
+    ++ lib.optional  pulseSupport    libpulseaudio
+    ++ lib.optional  pipewireSupport pipewire
+    ++ lib.optional  rtmpSupport     rtmpdump
+    ++ lib.optional  sambaSupport    samba
+    ++ lib.optional  udevSupport     udev
+    ++ lib.optional  usbSupport      libusb-compat-0_1
+    ++ lib.optional  vdpauSupport    libvdpau
+    ++ lib.optionals waylandSupport [
+      wayland
+      waylandpp.dev
+      wayland-protocols
+      # Not sure why ".dev" is needed here, but CMake doesn't find libxkbcommon otherwise
+      libxkbcommon.dev
+    ]
+    ++ lib.optionals gbmSupport [
+      libxkbcommon.dev
+      mesa.dev
+      libinput.dev
+      libdisplay-info
+    ];*/
+
     nativeBuildInputs = [
       cmake
       doxygen
@@ -163,14 +346,21 @@ in stdenv.mkDerivation (finalAttrs: {
       which
       pkg-config
       autoconf automake libtool # still needed for some components. Check if that is the case with 19.0
-      jre_headless yasm gettext python3Packages.python flatbuffers
+      buildPackages.jre_headless # Used at bulid time
+      yasm gettext python3Packages.python flatbuffers
 
       # for TexturePacker
       giflib zlib libpng libjpeg lzo
+      #
+      curl
+
     ] ++ lib.optionals waylandSupport [ wayland-protocols waylandpp.bin ];
 
     depsBuildBuild = [
       buildPackages.stdenv.cc
+      buildPackages.lzo
+      #buildPackages.libGL buildPackages.libGLU buildPackages.ftgl
+      #buildPackages.curl
     ];
 
     cmakeFlags = [
@@ -202,23 +392,16 @@ in stdenv.mkDerivation (finalAttrs: {
       "-DKODI_WEBSERVER_EXTRA_WHITELIST=${builtins.storeDir}"
     ] ++ lib.optionals waylandSupport [
       "-DWAYLANDPP_SCANNER=${buildPackages.waylandpp}/bin/wayland-scanner++"
+    ] ++ [
+      # Tell CMake where to find the internal dependencies that we built with
+      # the build-build toolchain
+      "-DWITH_JSONSCHEMABUILDER=${jsonSchemaBuilderFor finalAttrs}/bin/JsonSchemaBuilder"
+      "-DWITH_TEXTUREPACKER=${texturePackerFor finalAttrs}/bin/TexturePacker"
     ];
 
     # 14 tests fail but the biggest issue is that every test takes 30 seconds -
     # I'm guessing there is a thing waiting to time out
     doCheck = false;
-
-    preConfigure = ''
-      cmakeFlagsArray+=("-DCORE_PLATFORM_NAME=${lib.concatStringsSep " " kodi_platforms}")
-    '' + lib.optionalString (stdenv.hostPlatform != stdenv.buildPlatform) ''
-      # Need these tools on the build system when cross compiling,
-      # hacky, but have found no other way.
-      CXX=$CXX_FOR_BUILD LD=ld make -C tools/depends/native/JsonSchemaBuilder
-      cmakeFlags+=" -DWITH_JSONSCHEMABUILDER=$PWD/tools/depends/native/JsonSchemaBuilder/bin"
-
-      CXX=$CXX_FOR_BUILD LD=ld make EXTRA_CONFIGURE= -C tools/depends/native/TexturePacker
-      cmakeFlags+=" -DWITH_TEXTUREPACKER=$PWD/tools/depends/native/TexturePacker/bin"
-    '';
 
     postPatch = ''
       substituteInPlace xbmc/platform/posix/PosixTimezone.cpp \
