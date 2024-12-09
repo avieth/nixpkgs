@@ -63,7 +63,8 @@ in
       #  - early storage (e.g. USB) support
 
       # Allows using framebuffer configured by the initial boot firmware
-      "simplefb"
+      # FIXME should be "simplefb" if the kernel is older than 5.15
+      "simpledrm"
 
       # Broadcom
       "vc4"
