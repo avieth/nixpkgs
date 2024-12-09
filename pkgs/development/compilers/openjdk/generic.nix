@@ -3,6 +3,7 @@
 
   lib,
   stdenv,
+  buildPackages,
 
   fetchurl,
   fetchpatch,
@@ -70,6 +71,8 @@
   gtk2,
   glib,
 
+  # FIXME remove these; buildPackages is used because the boot compiler must
+  # target the build machine.
   temurin-bin-8,
   temurin-bin-11,
   temurin-bin-17,
@@ -77,11 +80,11 @@
   temurin-bin-23,
   jdk-bootstrap ?
     {
-      "8" = temurin-bin-8;
-      "11" = temurin-bin-11;
-      "17" = temurin-bin-17;
-      "21" = temurin-bin-21;
-      "23" = temurin-bin-23;
+      "8" = buildPackages.temurin-bin-8;
+      "11" = buildPackages.temurin-bin-11;
+      "17" = buildPackages.temurin-bin-17;
+      "21" = buildPackages.temurin-bin-21;
+      "23" = buildPackages.temurin-bin-23;
     }
     .${featureVersion},
 }:
@@ -228,6 +231,12 @@ stdenv.mkDerivation (finalAttrs: {
       )
     ];
 
+  depsBuildBuild =
+    [
+      buildPackages.stdenv.cc
+      buildPackages.zlib
+    ];
+
   nativeBuildInputs =
     [
       pkg-config
@@ -239,7 +248,9 @@ stdenv.mkDerivation (finalAttrs: {
       lndir
     ]
     ++ [
+      which
       unzip
+      zip
     ]
     ++ lib.optionals atLeast21 [
       ensureNewerSourcesForZipFilesHook
@@ -405,6 +416,10 @@ stdenv.mkDerivation (finalAttrs: {
 
   env =
     {
+      # For some reason the configure script can't find autoconf in the PATH but
+      # setting this gets by it
+      AUTOCONF = "${buildPackages.autoconf}/bin/autoconf";
+
       NIX_CFLAGS_COMPILE =
         if atLeast17 then
           "-Wno-error"
