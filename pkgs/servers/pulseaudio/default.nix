@@ -47,6 +47,9 @@ stdenv.mkDerivation rec {
   };
 
   patches = [
+
+    ./fix-rtp.patch
+
     # Install sysconfdir files inside of the nix store,
     # but use a conventional runtime sysconfdir outside the store
     ./add-option-for-installation-sysconfdir.patch
