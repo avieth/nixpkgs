@@ -1,5 +1,6 @@
 {
   lib,
+  buildPackages,
   addonDir,
   buildKodiAddon,
   fetchFromGitHub,
@@ -12,7 +13,7 @@
   websocket,
 }:
 let
-  python = kodi.pythonPackages.python.withPackages (p: with p; [ pyyaml ]);
+  python = buildPackages.python3Packages.python.withPackages(p: with p; [ pyyaml ]);
 in
 buildKodiAddon rec {
   pname = "jellycon";
@@ -37,7 +38,7 @@ buildKodiAddon rec {
   '';
 
   buildPhase = ''
-    ${python}/bin/python3 build.py --version=py3
+    python3 build.py --version=py3
   '';
 
   postInstall = ''
