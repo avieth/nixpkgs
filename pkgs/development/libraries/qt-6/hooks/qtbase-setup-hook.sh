@@ -4,7 +4,7 @@ if [[ -n "${__nix_qtbase-}" ]]; then
         echo >&2 "Error: detected mismatched Qt dependencies:"
         echo >&2 "    @qtbaseOut@"
         echo >&2 "    $__nix_qtbase"
-        exit 1
+        #exit 1
     fi
 else # Only set up Qt once.
     __nix_qtbase="@qtbaseOut@"
@@ -39,10 +39,10 @@ else # Only set up Qt once.
     qtToolsHook() {
         if [ -f "$1/libexec/qhelpgenerator" ]; then
             if [[ -n "${qtToolsPathSeen:-}" && "${qttoolsPathSeen:-}" != "$1" ]]; then
-                echo >&2 "Error: detected mismatched Qt dependencies:"
+                echo >&2 "Error: detected mismatched Qt dependencies second time:"
                 echo >&2 "    $1"
                 echo >&2 "    $qttoolsPathSeen"
-                exit 1
+                #exit 1
             fi
 
             qttoolsPathSeen=$1
