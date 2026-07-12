@@ -1,5 +1,4 @@
 {
-  buildPackages,
   stdenv,
   lib,
   fetchFromGitHub,
@@ -90,13 +89,13 @@ stdenv.mkDerivation (finalAttrs: {
 
     "-DSDDM_INITIAL_VT=1"
 
+    "-DQT_IMPORTS_DIR=${placeholder "out"}/${qtbase.qtQmlPrefix}"
     "-DCMAKE_INSTALL_SYSCONFDIR=${placeholder "out"}/etc"
     "-DSYSTEMD_SYSTEM_UNIT_DIR=${placeholder "out"}/lib/systemd/system"
     "-DSYSTEMD_SYSUSERS_DIR=${placeholder "out"}/lib/sysusers.d"
     "-DSYSTEMD_TMPFILES_DIR=${placeholder "out"}/lib/tmpfiles.d"
     "-DDBUS_CONFIG_DIR=${placeholder "out"}/share/dbus-1/system.d"
   ];
-    # "-DQT_IMPORTS_DIR=${placeholder "out"}/${buildPackages.qtbase.qtQmlPrefix}"
 
   postInstall = ''
     # remove empty scripts
