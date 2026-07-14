@@ -20,6 +20,7 @@
   # Select a specific optimization target (other than the default)
   # See https://github.com/OpenMathLib/OpenBLAS/blob/develop/TargetList.txt
   target ? null,
+  configName ? null,
   # Select whether DYNAMIC_ARCH is enabled or not.
   dynamicArch ? null,
   # enable AVX512 optimized kernels.
@@ -52,6 +53,7 @@ let
   # To add support for a new platform, add an element to this set.
   configs = {
     armv6l-linux = {
+      ARCH = "arm64";
       BINARY = 32;
       TARGET = setTarget "ARMV6";
       DYNAMIC_ARCH = setDynamicArch false;
@@ -59,6 +61,7 @@ let
     };
 
     armv7l-linux = {
+      ARCH = "arm64";
       BINARY = 32;
       TARGET = setTarget "ARMV7";
       DYNAMIC_ARCH = setDynamicArch false;
@@ -74,6 +77,7 @@ let
     };
 
     aarch64-linux = {
+      ARCH = "arm64";
       BINARY = 64;
       TARGET = setTarget "ARMV8";
       DYNAMIC_ARCH = setDynamicArch true;
@@ -157,9 +161,10 @@ let
 in
 
 let
+  configNameToUse = if configName == null then throw "blargh" else configName; # stdenv.hostPlatform.system else configName;
   config =
-    configs.${stdenv.hostPlatform.system}
-      or (throw "unsupported system: ${stdenv.hostPlatform.system}");
+    configs.${configNameToUse}
+      or (throw "unsupported system: ${configNameToUse}");
 in
 
 let
@@ -240,6 +245,7 @@ stdenv.mkDerivation (finalAttrs: {
   ];
 
   cmakeFlags = [
+    (lib.cmakeFeature "ARCH" config.ARCH)
     (lib.cmakeFeature "TARGET" config.TARGET)
     (lib.cmakeBool "DYNAMIC_ARCH" config.DYNAMIC_ARCH)
     (lib.cmakeBool "USE_OPENMP" config.USE_OPENMP)
