@@ -71,6 +71,9 @@ let
         i: a: "password \"{{password-${toString i}}}@${lib.concatStringsSep "," a.permissions}\""
       ) cfg.credentials
     );
+  } // (
+  # Avoid building mpd for the build platform
+  if pkgs.stdenv.hostPlatform == pkgs.stdenv.buildPlatform then {
     derivationArgs = {
       expectScript = ''
         spawn ${lib.getExe pkgs.buildPackages.mpd} --no-daemon "$env(out)"
@@ -91,7 +94,7 @@ let
     checkPhase = ''
       ${lib.getExe pkgs.buildPackages.expect} -f "$expectScriptPath"
     '';
-  };
+  } else {});
 
 in
 {
